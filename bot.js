@@ -11,6 +11,8 @@ if (!BOT_TOKEN || !WEBAPP_URL) throw new Error("Thiếu BOT_TOKEN hoặc WEBAPP_
 
 // Giá phải khớp với PRODUCTS trong index.html
 const PRODUCTS = {
+  lives5:   { title: "Hồi đầy 5 mạng",  description: "Nạp đầy 5 mạng để chơi tiếp ngay",   stars: 20 },
+  inf1h:    { title: "Mạng vô hạn 1 giờ", description: "Chơi không giới hạn mạng trong 60 phút", stars: 35 },
   moves5:   { title: "+5 lượt đi",      description: "Thêm 5 lượt để hoàn thành màn chơi", stars: 15 },
   hammer3:  { title: "3 Búa",           description: "Đập vỡ bất kỳ ô nào trên bàn",       stars: 25 },
   shuffle3: { title: "3 lần Trộn",      description: "Xáo trộn lại toàn bộ bàn chơi",      stars: 20 },

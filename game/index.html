@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ghép Trái Cây</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { --panel:#2a1a52; --accent:#ffcc33; --pink:#ff6f91; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; color:#fff; overflow:hidden; user-select:none; -webkit-user-select:none;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:radial-gradient(circle at 50% 0,#3b2477,#140a2a 70%); }
+  .hidden { display:none !important; }
+  .btn { flex:1; border:0; border-radius:12px; padding:10px 6px; font-size:15px; font-weight:600; color:#fff;
+    background:var(--panel); cursor:pointer; }
+  .btn.sm { flex:none; padding:8px 12px; }
+  .btn.on { background:var(--accent); color:#2a1a52; }
+  .btn.gold { background:linear-gradient(90deg,var(--accent),#ff9f1c); color:#2a1a52; }
+  .btn:active { transform:scale(.96); }
+
+  /* ===== BẢN ĐỒ ===== */
+  #mapScreen { position:fixed; inset:0; display:flex; flex-direction:column; }
+  .maptop { padding:12px 12px; display:flex; gap:6px; align-items:center; background:#140a2add; z-index:2; box-shadow:0 4px 12px #0006; }
+  .maptop h1 { font-size:16px; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .inv { font-size:14px; opacity:.9; white-space:nowrap; }
+  #path { flex:1; overflow-y:auto; padding:40px 0 80px; display:flex; flex-direction:column; align-items:center; gap:26px; }
+  .nodewrap { display:flex; flex-direction:column; align-items:center; }
+  .node { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:22px; font-weight:800; border:0; cursor:pointer; position:relative; color:#3b2477;
+    background:radial-gradient(circle at 35% 30%,#ffe9a8,#ff9f1c); box-shadow:0 5px 0 #b86b00,0 8px 14px #0009; }
+  .node.hard { background:radial-gradient(circle at 35% 30%,#ffb3be,#e0314b); color:#fff; box-shadow:0 5px 0 #8f1a2c,0 8px 14px #0009; }
+  .node.super { background:radial-gradient(circle at 35% 30%,#e3b8ff,#8a2be2); color:#fff; box-shadow:0 5px 0 #4b1580,0 8px 14px #0009; }
+  .node.lock { background:#3a2c5e; color:#8d7fb3; box-shadow:0 5px 0 #241a3d; cursor:default; }
+  .node.cur { animation:glow 1.2s infinite; }
+  .node .tag { position:absolute; top:-12px; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px; background:#000c; color:#fff; white-space:nowrap; }
+  .stars { font-size:13px; margin-top:8px; letter-spacing:1px; min-height:16px; }
+  @keyframes glow { 0%,100% { box-shadow:0 5px 0 #b86b00,0 0 0 0 #ffcc33aa; } 50% { box-shadow:0 5px 0 #b86b00,0 0 0 12px #ffcc3300; } }
+
+  /* ===== MÀN CHƠI ===== */
+  #app { display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 12px 14px; height:100%; }
+  .w { width:min(94vw,440px); }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .top h1 { font-size:18px; margin:0; flex:1; text-align:center; }
+  .badge { font-size:11px; padding:2px 7px; border-radius:6px; vertical-align:middle; margin-left:4px; }
+  .badge.hard { background:#e0314b; } .badge.super { background:#8a2be2; }
+  .hud { display:flex; gap:8px; }
+  .stat { flex:1; background:var(--panel); border-radius:12px; padding:5px 8px; text-align:center; }
+  .stat b { display:block; font-size:20px; }
+  .stat small { opacity:.7; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+  .goals { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+  .chip { background:var(--panel); border-radius:10px; padding:4px 10px; font-weight:700; font-size:16px; display:flex; align-items:center; gap:5px; }
+  .chip.done { background:#1f6f43; }
+  .ico-j { width:16px; height:16px; border-radius:4px; background:#ff5fc8; display:inline-block; box-shadow:inset 0 0 0 2px #ffa5e2; }
+  .progress { position:relative; height:10px; background:#0006; border-radius:6px; margin:4px 0 8px; }
+  .progress > div { height:100%; width:0; border-radius:6px; background:linear-gradient(90deg,var(--accent),var(--pink)); transition:width .3s; }
+  .progress .mk { position:absolute; top:50%; transform:translate(-50%,-50%); font-size:14px; filter:grayscale(1) brightness(.6); }
+  .progress .mk.got { filter:none; }
+
+  .wrap { position:relative; }
+  #board { display:grid; grid-template-columns:repeat(8,1fr); aspect-ratio:1; background:#0005; border-radius:14px;
+    padding:4px; gap:3px; touch-action:none; overflow:hidden; }
+  #fx { position:absolute; inset:0; pointer-events:none; overflow:hidden; border-radius:14px; }
+  .cell { background:#ffffff10; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-size:min(7vw,32px); line-height:1; position:relative; }
+  .cell.hole { background:transparent; }
+  .cell.j1 { background:#ff5fc855; box-shadow:inset 0 0 0 2px #ff8ad866; }
+  .cell.j2 { background:#c93a9fcc; box-shadow:inset 0 0 0 2px #ffa5e2; }
+  .cell.sel { background:#ffcc3355; box-shadow:0 0 0 2px var(--accent) inset; }
+  .cell.aim { cursor:crosshair; }
+
+  .gem { position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  .fruit { filter:drop-shadow(0 2px 2px #0007); position:relative; z-index:1; }
+  .fx-h, .fx-v, .fx-b { position:absolute; pointer-events:none; z-index:2; }
+  .fx-h { left:4%; right:4%; top:50%; height:26%; transform:translateY(-50%);
+    border-top:3px solid #fff; border-bottom:3px solid #fff; border-radius:4px;
+    box-shadow:0 0 8px #fff, inset 0 0 6px #ffffffaa; animation:shimmer .8s infinite alternate; }
+  .fx-v { top:4%; bottom:4%; left:50%; width:26%; transform:translateX(-50%);
+    border-left:3px solid #fff; border-right:3px solid #fff; border-radius:4px;
+    box-shadow:0 0 8px #fff, inset 0 0 6px #ffffffaa; animation:shimmer .8s infinite alternate; }
+  .fx-b { inset:3%; border-radius:50%; border:3px solid var(--accent);
+    box-shadow:0 0 12px #ff9f1c, inset 0 0 10px #ff9f1c; animation:pulse .9s infinite ease-in-out; z-index:0; }
+  .sp-b { background:radial-gradient(circle,#ff9f1c55,transparent 70%); border-radius:8px; }
+  .orb { width:78%; aspect-ratio:1; border-radius:50%; position:relative;
+    background:conic-gradient(#ff4d6d,#ffb347,#ffe66d,#7bed9f,#4dd0ff,#9b6dff,#ff6fd8,#ff4d6d);
+    box-shadow:0 0 14px #fff9, inset 0 0 0 2px #fff8; animation:spin 2.2s linear infinite; }
+  .orb::after { content:""; position:absolute; inset:22%; border-radius:50%; background:radial-gradient(circle at 35% 35%,#fff,#fff0 70%); }
+
+  /* Chướng ngại */
+  .box { width:94%; height:94%; border-radius:6px; position:relative; border:2px solid #5a3310;
+    background:repeating-linear-gradient(0deg,#c27f43 0 29%,#8f5526 29% 34%); box-shadow:inset 0 0 0 3px #e3a76a55,0 2px 3px #0008; }
+  .box::before, .box::after { content:""; position:absolute; width:4px; height:4px; border-radius:50%; background:#4a2a0d; top:3px; }
+  .box::before { left:3px; } .box::after { right:3px; }
+  .box.b2 { filter:brightness(.82) saturate(1.15); } .box.b3 { filter:brightness(.66) saturate(1.3); }
+  .box i { position:absolute; right:3px; bottom:1px; font-style:normal; font-size:12px; font-weight:800; color:#fff; text-shadow:0 1px 2px #000; }
+  .box.hit { animation:shake .25s; }
+  .cage { position:absolute; inset:5%; border-radius:8px; z-index:3; border:2px solid #d5dbea; pointer-events:none;
+    background:repeating-linear-gradient(90deg,transparent 0 19%,#d5dbeadd 19% 27%); box-shadow:0 0 5px #000a; }
+
+  .gem.pop { animation:pop .26s forwards; }
+  .gem.drop { animation:drop .3s ease-in; }
+  .gem.born { animation:born .35s ease-out; }
+  .gem.hint { animation:wiggle .6s ease-in-out 3; }
+  @keyframes pop { to { transform:scale(1.6); opacity:0; } }
+  @keyframes drop { from { transform:translateY(calc(-1 * var(--d))); } to { transform:none; } }
+  @keyframes born { 0% { transform:scale(.2) rotate(-90deg); } 70% { transform:scale(1.25); } 100% { transform:none; } }
+  @keyframes pulse { 0%,100% { transform:scale(.88); opacity:.7; } 50% { transform:scale(1.04); opacity:1; } }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes shimmer { from { opacity:.55; } to { opacity:1; } }
+  @keyframes wiggle { 0%,100% { transform:none; } 25% { transform:rotate(-12deg) scale(1.1); } 75% { transform:rotate(12deg) scale(1.1); } }
+  @keyframes shake { 25% { transform:translateX(-3px); } 75% { transform:translateX(3px); } }
+
+  .f { position:absolute; pointer-events:none; transform:translate(-50%,-50%); }
+  .f.bh { width:var(--w); height:calc(var(--cs) * .45); border-radius:99px;
+    background:linear-gradient(90deg,transparent,#fff 15%,#fff6a8 50%,#fff 85%,transparent); box-shadow:0 0 16px #fff; animation:beamH .45s ease-out forwards; }
+  .f.bv { height:var(--h); width:calc(var(--cs) * .45); border-radius:99px;
+    background:linear-gradient(180deg,transparent,#fff 15%,#fff6a8 50%,#fff 85%,transparent); box-shadow:0 0 16px #fff; animation:beamV .45s ease-out forwards; }
+  .f.boom { width:calc(var(--cs) * var(--k)); height:calc(var(--cs) * var(--k)); border-radius:50%;
+    border:4px solid var(--accent); box-shadow:0 0 24px #ff9f1c, inset 0 0 24px #ff9f1c; animation:boom .5s ease-out forwards; }
+  .f.spark { width:var(--cs); height:var(--cs); border-radius:50%; background:radial-gradient(circle,#fff 0,#fffa 30%,transparent 70%); animation:spark .45s ease-out forwards; }
+  @keyframes beamH { from { transform:translate(-50%,-50%) scaleX(0); opacity:1; } 60% { opacity:1; } to { transform:translate(-50%,-50%) scaleX(1); opacity:0; } }
+  @keyframes beamV { from { transform:translate(-50%,-50%) scaleY(0); opacity:1; } 60% { opacity:1; } to { transform:translate(-50%,-50%) scaleY(1); opacity:0; } }
+  @keyframes boom { from { transform:translate(-50%,-50%) scale(.2); opacity:1; } to { transform:translate(-50%,-50%) scale(1); opacity:0; } }
+  @keyframes spark { from { transform:translate(-50%,-50%) scale(.3); opacity:1; } to { transform:translate(-50%,-50%) scale(1.4); opacity:0; } }
+
+  .tools { display:flex; gap:8px; }
+  #modal { position:fixed; inset:0; background:#000a; display:none; align-items:center; justify-content:center; padding:16px; z-index:10; }
+  #modal.show { display:flex; }
+  .card { background:var(--panel); border-radius:18px; padding:20px; width:min(92vw,380px); text-align:center; max-height:92vh; overflow:auto; }
+  .card h2 { margin:0 0 6px; }
+  .card p { opacity:.85; margin:0 0 14px; }
+  .card .btn { display:block; width:100%; margin-top:8px; }
+  .card .goals { margin:10px 0 14px; }
+  .bigstars { font-size:40px; letter-spacing:4px; margin:6px 0; }
+  .intro { background:#0003; border-radius:12px; padding:10px 12px; text-align:left; font-size:14px; margin-bottom:12px; }
+  .item { display:flex; justify-content:space-between; align-items:center; background:#0003; border-radius:12px; padding:10px 12px; margin-top:8px; text-align:left; }
+  .item .btn { width:auto; margin:0; flex:none; padding:8px 12px; }
+  .rule { display:flex; align-items:center; gap:12px; background:#0003; border-radius:12px; padding:8px 12px; margin-top:8px; text-align:left; font-size:14px; }
+  .rule .demo { flex:none; width:44px; height:44px; font-size:28px; background:#ffffff10; border-radius:10px; display:flex; align-items:center; justify-content:center; position:relative; }
+  .lives { font-size:14px; font-weight:700; background:#0004; padding:5px 9px; border-radius:10px; white-space:nowrap; }
+  .lifebig { font-size:34px; letter-spacing:2px; margin:6px 0; }
+  .timer { font-size:28px; font-weight:800; color:var(--accent); margin:4px 0 10px; font-variant-numeric:tabular-nums; }
+  #toast { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%) scale(.8); opacity:0; pointer-events:none;
+    font-size:26px; font-weight:800; color:var(--accent); text-shadow:0 2px 8px #000; transition:.2s; z-index:20; white-space:nowrap; }
+  #toast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
+</style>
+</head>
+<body>
+<div id="mapScreen">
+  <div class="maptop">
+    <h1>🍓 Ghép Trái Cây</h1>
+    <span class="lives" id="lives" data-action="livesInfo">❤️ 5</span>
+    <span class="inv hidden" id="inv"></span>
+    <button class="btn sm" data-action="help">❓</button>
+    <button class="btn sm" data-action="shop">🛒</button>
+  </div>
+  <div id="path"></div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="w top">
+    <button class="btn sm" data-action="map">⬅</button>
+    <h1 id="title">Màn 1</h1>
+    <button class="btn sm" data-action="shop">🛒</button>
+  </div>
+  <div class="w hud">
+    <div class="stat"><small>Lượt</small><b id="mv">20</b></div>
+    <div class="stat" style="flex:2"><small>Điểm</small><b id="sc">0</b></div>
+  </div>
+  <div class="w goals" id="goals"></div>
+  <div class="w progress" id="prog"><div id="bar"></div></div>
+  <div class="w wrap" id="wrap"><div id="board"></div><div id="fx"></div></div>
+  <div class="w tools">
+    <button class="btn" id="hammerBtn" data-action="hammer">🔨 Búa</button>
+    <button class="btn" id="shuffleBtn" data-action="shuffle">🔀 Trộn</button>
+  </div>
+</div>
+<div id="modal"><div class="card" id="card"></div></div>
+<div id="toast"></div>
+
+<script>
+// ===== CẤU HÌNH =====
+// Địa chỉ server bot (bot.js). Để trống = chế độ thử: mua đồ miễn phí.
+const API_URL = "https://ghep-trai-cay-bot.onrender.com";
+const MAX_LIVES = 5, REGEN_MS = 30 * 60 * 1000; // 5 mạng, 30 phút hồi 1
+const PRODUCTS = {
+  lives5:  { name:"Hồi đầy 5 mạng ❤️",            stars:20 },
+  inf1h:   { name:"Mạng vô hạn 1 giờ ♾️",          stars:35 },
+  moves5:  { name:"+5 lượt đi",                   stars:15 },
+  hammer3: { name:"3 Búa 🔨",                     stars:25 },
+  shuffle3:{ name:"3 lần Trộn 🔀",                stars:20 },
+  starter: { name:"Gói khởi đầu: 5 Búa + 5 Trộn", stars:50 },
+};
+const NAMES = { h:"⚡ Quả sọc!", v:"⚡ Quả sọc!", b:"💣 Bom trái cây!", r:"🌈 Cầu vồng!" };
+
+// ===== DANH SÁCH MÀN =====
+// Ký hiệu bản đồ:  .  ô thường   #  ô trống (không có ô)
+//   j  thạch 1 lớp   J  thạch 2 lớp
+//   b  thùng gỗ 1 lớp   B  2 lớp   X  3 lớp
+//   c  quả bị nhốt trong lồng   q  lồng + thạch
+// goals: score (điểm) | collect {loại quả: số lượng} | jelly | box | cage
+// hard: 1 = Khó, 2 = Siêu khó.  intro: chướng ngại mới được giới thiệu ở màn này
+const F = "........";
+const FULL = [F,F,F,F,F,F,F,F];
+const LEVELS = [
+  // --- 1-6: làm quen (5 loại quả) ---
+  { moves:15, colors:5, goals:{ score:800 }, map:FULL },
+  { moves:13, colors:5, goals:{ score:1800 }, map:FULL },
+  { moves:14, colors:5, goals:{ score:2400 }, map:["#......#",F,F,F,F,F,F,"#......#"] },
+  { moves:18, colors:5, goals:{ collect:{ 0:28 } }, map:FULL, intro:"collect" },
+  { moves:16, colors:5, goals:{ collect:{ 1:40, 3:40 } }, map:["#......#",F,F,F,F,F,F,"#......#"], hard:1 },
+  { moves:18, colors:5, goals:{ score:3200 }, map:["##....##","#......#",F,F,F,F,"#......#","##....##"] },
+  // --- 7-10: thạch ---
+  { moves:13, colors:5, goals:{ jelly:1 }, map:[F,F,"..jjjj..","..jjjj..","..jjjj..","..jjjj..",F,F], intro:"jelly" },
+  { moves:16, colors:5, goals:{ jelly:1 }, map:[F,".jjjjjj.",".jjjjjj.",".jjjjjj.",".jjjjjj.",".jjjjjj.",".jjjjjj.",F] },
+  { moves:25, colors:5, goals:{ jelly:1 }, map:[F,F,F,F,F,"jjjjjjjj","jjjjjjjj","jjjjjjjj"] },
+  { moves:17, colors:5, goals:{ jelly:1 }, map:[F,F,"jJJjjJJj","jJJjjJJj","jjjjjjjj","jJJjjJJj","jJJjjJJj",F], hard:1 },
+  // --- 11-15: thùng gỗ ---
+  { moves:12, colors:5, goals:{ box:1 }, map:[F,F,F,"bbbbbbbb",F,F,F,F], intro:"box" },
+  { moves:19, colors:5, goals:{ box:1, collect:{ 2:35 } }, map:[F,F,"bb....bb","bb....bb","bb....bb","bb....bb",F,F] },
+  { moves:23, colors:5, goals:{ jelly:1, box:1 }, map:[F,F,"jjbbbbjj","jjbBBbjj","jjbBBbjj","jjbbbbjj","jjjjjjjj",F] },
+  { moves:17, colors:5, goals:{ box:1 }, map:[F,F,"..XXXX..",F,F,"BB.BB.BB",F,F] },
+  { moves:21, colors:5, goals:{ box:1 }, map:[F,F,F,F,F,"bbbbbbbb","BBBBBBBB","bbbbbbbb"], hard:1 },
+  // --- 16-20: bàn chơi nhiều hình dạng ---
+  { moves:18, colors:5, goals:{ score:2000 }, map:["###..###","##....##","#......#",F,F,"#......#","##....##","###..###"], intro:"hole" },
+  { moves:25, colors:5, goals:{ jelly:1 }, map:[F,F,"jjjjjjjj","jjj##jjj","jjj##jjj","jjjjjjjj",F,F] },
+  { moves:23, colors:5, goals:{ collect:{ 0:22, 4:22 } }, map:[F,F,"...##...","...##...","...##...","...##...",F,F] },
+  { moves:17, colors:5, goals:{ box:1 }, map:["##....##","#.BBBB.#","..B..B..","..B..B..","..B..B..","..BBBB..","#......#","##....##"] },
+  { moves:17, colors:5, goals:{ jelly:1, box:1 }, map:["#......#",".jjjjjj.",".jbbbbj.",".jbBBbj.",".jbBBbj.",".jbbbbj.","jjjjjjjj","#jjjjjj#"], hard:2 },
+  // --- 21-25: lồng ---
+  { moves:18, colors:5, goals:{ cage:1 }, map:[F,F,".c.cc.c.",F,F,".c.cc.c.",F,F], intro:"cage" },
+  { moves:22, colors:5, goals:{ jelly:1, cage:1 }, map:[F,".q....q.","..jjjj..","..jqqj..","..jqqj..","..jjjj..",".q....q.",F] },
+  { moves:21, colors:5, goals:{ cage:1, collect:{ 3:12 } }, map:[F,F,".c....c.","..cccc..","..cccc..",".c....c.",F,F] },
+  { moves:16, colors:5, goals:{ box:1, cage:1 }, map:[F,"bbbbbbbb","..c..c..",F,F,"..c..c..","bbbbbbbb",F] },
+  { moves:22, colors:5, goals:{ jelly:1, box:1, cage:1 }, map:[F,".c....c.","jjbbbbjj","jjbccbjj","jjb..bjj","jjbbbbjj","jjjjjjjj","jjjjjjjj"], hard:1 },
+  // --- 26-30: thêm loại quả thứ 6 ---
+  { moves:23, colors:6, goals:{ score:2200 }, map:FULL, intro:"six" },
+  { moves:28, colors:6, goals:{ jelly:1 }, map:[F,F,F,F,F,"..jjjj..",".jjjjjj.",".jjjjjj."] },
+  { moves:17, colors:6, goals:{ box:1, collect:{ 1:14 } }, map:[F,F,"bb.bb.bb",F,F,"bb.bb.bb",F,F] },
+  { moves:24, colors:6, goals:{ cage:1 }, map:["##....##","#......#",F,"..cccc..","..cccc..",F,"#......#","##....##"] },
+  { moves:21, colors:6, goals:{ jelly:1, box:1, cage:1 }, map:["#......#",".bbbbbb.",".bjqqjb.",".bjBBjb.",".bjBBjb.",".bjqqjb.",".bbbbbb.","#......#"], hard:2 },
+];
+
+const INTROS = {
+  collect:"🎯 <b>Nhiệm vụ mới:</b> thu thập đủ số quả được yêu cầu trước khi hết lượt.",
+  jelly:"<span class='ico-j'></span> <b>Thạch:</b> ghép quả nằm trên ô thạch để phá thạch. Thạch màu đậm cần phá 2 lần.",
+  box:"📦 <b>Thùng gỗ:</b> ghép quả ngay sát bên cạnh, hoặc dùng quả đặc biệt để phá. Số trên thùng là số lần cần đánh.",
+  hole:"🧩 <b>Bàn chơi hình dạng mới!</b> Tận dụng quả sọc và bom để phá những góc khó với tới.",
+  cage:"⛓️ <b>Lồng:</b> quả bị nhốt không di chuyển được. Ghép nó với quả cùng loại, hoặc dùng quả đặc biệt để mở lồng.",
+  six:"🍑 <b>Thêm loại quả thứ 6!</b> Ghép sẽ khó hơn, hãy tính trước từng nước.",
+};
+
+// Màn sau 30 được tự sinh từ các màn mẫu, độ khó lặp theo chu kỳ 10 màn
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function getLevel(n) {
+  if (n <= LEVELS.length) return LEVELS[n - 1];
+  const rng = mulberry(n * 7919);
+  const pool = LEVELS.slice(10).filter((l) => !l.hard && !l.intro);
+  const tpl = pool[Math.floor(rng() * pool.length)];
+  let map = tpl.map.slice();
+  if (rng() < 0.5) map = map.map((row) => [...row].reverse().join(""));
+  if (rng() < 0.5) map = map.slice().reverse();
+  const goals = JSON.parse(JSON.stringify(tpl.goals));
+  if (goals.collect) {
+    const out = {}; Object.values(goals.collect).forEach((v) => { let t; do { t = Math.floor(rng() * tpl.colors); } while (out[t]); out[t] = v; });
+    goals.collect = out;
+  }
+  if (goals.score) goals.score = Math.round(goals.score * 1.1);
+  const pos = n % 10;
+  const hard = pos === 0 ? 2 : pos === 5 ? 1 : 0;
+  const adj = hard === 2 ? -4 : hard === 1 ? -3 : (pos === 1 || pos === 6) ? 2 : 0;
+  return { moves:Math.max(12, tpl.moves + adj), colors:tpl.colors, goals, map, hard };
+}
+function starsFor(lv) {
+  const base = lv.goals.score || lv.moves * 55;
+  return lv.goals.score ? [lv.goals.score, Math.round(base * 1.35), Math.round(base * 1.7)] : [0, Math.round(base * 1.3), Math.round(base * 1.8)];
+}
+
+// ===== ENGINE (logic thuần, không đụng giao diện) =====
+const FRUITS = ["🍓","🍋","🍇","🍏","🍊","🍑"];
+const N = 8;
+const BONUS = { h:30, v:30, b:50, r:100 };
+const rc = (i) => [Math.floor(i / N), i % N];
+const inb = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+// Ô quả: { t: loại 0-5 (-1 = cầu vồng), s: 0|'h'|'v'|'b'|'r', lock: 0|1 }
+
+function makeState(lv) {
+  const S = { g:[], hole:[], jelly:[], box:[], nc:lv.colors, score:0, moves:lv.moves, goals:lv.goals, collected:[0,0,0,0,0,0] };
+  for (let r = 0; r < N; r++) {
+    S.g[r] = []; S.hole[r] = []; S.jelly[r] = []; S.box[r] = [];
+    for (let c = 0; c < N; c++) {
+      const ch = lv.map[r][c];
+      S.hole[r][c] = ch === "#";
+      S.jelly[r][c] = ch === "j" || ch === "q" ? 1 : ch === "J" ? 2 : 0;
+      S.box[r][c] = { b:1, B:2, X:3 }[ch] || 0;
+      S.g[r][c] = S.hole[r][c] || S.box[r][c] ? null : { t:0, s:0, lock:ch === "c" || ch === "q" ? 1 : 0 };
+    }
+  }
+  fill(S);
+  return S;
+}
+const rnd = (S) => Math.floor(Math.random() * S.nc);
+const cellAt = (S, i) => S.g[Math.floor(i / N)][i % N];
+
+function fill(S) {
+  const same = (r, c, t) => r >= 0 && c >= 0 && S.g[r][c] && S.g[r][c].t === t;
+  for (let tries = 0; tries < 60; tries++) {
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const x = S.g[r][c]; if (!x) continue;
+      let t;
+      do { t = rnd(S); } while ((same(r, c-1, t) && same(r, c-2, t)) || (same(r-1, c, t) && same(r-2, c, t)));
+      x.t = t; x.s = 0;
+    }
+    if (hasMove(S)) return;
+  }
+}
+
+function isStatic(S, r, c) { return S.hole[r][c] || S.box[r][c] > 0 || (S.g[r][c] && S.g[r][c].lock); }
+function swappable(S, i) { const x = cellAt(S, i); return !!x && !x.lock; }
+
+function swapCells(S, a, b) {
+  const [r1, c1] = rc(a), [r2, c2] = rc(b);
+  [S.g[r1][c1], S.g[r2][c2]] = [S.g[r2][c2], S.g[r1][c1]];
+}
+
+function runs(S) {
+  const out = [];
+  const T = (r, c) => (S.g[r][c] ? S.g[r][c].t : -2);
+  for (let r = 0; r < N; r++) {
+    let c = 0;
+    while (c < N) {
+      const t = T(r, c); let e = c + 1;
+      if (t >= 0) {
+        while (e < N && T(r, e) === t) e++;
+        if (e - c >= 3) { const cells = []; for (let k = c; k < e; k++) cells.push(r * N + k); out.push({ dir:"h", t, cells }); }
+      }
+      c = e;
+    }
+  }
+  for (let c = 0; c < N; c++) {
+    let r = 0;
+    while (r < N) {
+      const t = T(r, c); let e = r + 1;
+      if (t >= 0) {
+        while (e < N && T(e, c) === t) e++;
+        if (e - r >= 3) { const cells = []; for (let k = r; k < e; k++) cells.push(k * N + c); out.push({ dir:"v", t, cells }); }
+      }
+      r = e;
+    }
+  }
+  return out;
+}
+
+function groups(S, prefer = []) {
+  const rs = runs(S);
+  if (!rs.length) return [];
+  const parent = rs.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const owner = {};
+  rs.forEach((run, i) => run.cells.forEach((x) => {
+    if (owner[x] !== undefined) parent[find(i)] = find(owner[x]); else owner[x] = i;
+  }));
+  const byRoot = new Map();
+  rs.forEach((run, i) => { const k = find(i); if (!byRoot.has(k)) byRoot.set(k, []); byRoot.get(k).push(run); });
+  return [...byRoot.values()].map((list) => {
+    const cells = new Set(), count = {};
+    list.forEach((run) => run.cells.forEach((x) => { cells.add(x); count[x] = (count[x] || 0) + 1; }));
+    const longest = list.reduce((a, b) => (b.cells.length > a.cells.length ? b : a));
+    const hasH = list.some((r) => r.dir === "h"), hasV = list.some((r) => r.dir === "v");
+    let special = 0;
+    if (longest.cells.length >= 5) special = "r";
+    else if (hasH && hasV) special = "b";
+    else if (longest.cells.length === 4) special = longest.dir;
+    let spawn = -1;
+    if (special) {
+      const cand = prefer.filter((x) => cells.has(x));
+      if (special === "b") cand.push(...[...cells].filter((x) => count[x] > 1));
+      cand.push(longest.cells[Math.floor(longest.cells.length / 2)], ...cells);
+      const ok = cand.find((x) => { const c = cellAt(S, x); return !c.s && !c.lock; });
+      spawn = ok === undefined ? -1 : ok;
+    }
+    return { cells, special, spawn, t:list[0].t };
+  });
+}
+
+function findMove(S) {
+  for (let i = 0; i < N * N; i++) {
+    if (!swappable(S, i)) continue;
+    const [r, c] = rc(i);
+    for (const j of [c < N - 1 ? i + 1 : -1, r < N - 1 ? i + N : -1]) {
+      if (j < 0 || !swappable(S, j)) continue;
+      const A = cellAt(S, i), B = cellAt(S, j);
+      if (A.s === "r" || B.s === "r" || (A.s && B.s)) return [i, j];
+      swapCells(S, i, j);
+      const ok = runs(S).length > 0;
+      swapCells(S, i, j);
+      if (ok) return [i, j];
+    }
+  }
+  return null;
+}
+const hasMove = (S) => !!findMove(S);
+
+function shuffle(S) {
+  const pos = [];
+  for (let i = 0; i < N * N; i++) if (swappable(S, i)) pos.push(i);
+  const items = pos.map((i) => cellAt(S, i));
+  for (let tries = 0; tries < 300; tries++) {
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+    pos.forEach((p, k) => { const [r, c] = rc(p); S.g[r][c] = items[k]; });
+    if (tries > 150) items.forEach((x) => { if (!x.s) x.t = rnd(S); });
+    if (!runs(S).length && hasMove(S)) return;
+  }
+}
+
+function mostColor(S) {
+  const cnt = Array(6).fill(0);
+  S.g.flat().forEach((x) => { if (x && x.t >= 0) cnt[x.t]++; });
+  return cnt.indexOf(Math.max(...cnt));
+}
+
+function area(S, cell, r, c) {
+  const out = [];
+  if (cell.s === "h") for (let k = 0; k < N; k++) out.push(r * N + k);
+  if (cell.s === "v") for (let k = 0; k < N; k++) out.push(k * N + c);
+  if (cell.s === "b") for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inb(r + dr, c + dc)) out.push((r + dr) * N + c + dc);
+  if (cell.s === "r") { const t = mostColor(S); for (let i = 0; i < N * N; i++) { const x = cellAt(S, i); if (x && x.t === t) out.push(i); } }
+  return out;
+}
+
+// Tính kết quả một đợt nổ (chưa thay đổi bàn chơi)
+function computeBlast(S, initial, protect = new Set()) {
+  const clear = new Set(), unlock = new Set(), boxHit = new Set(), queue = [], effects = [];
+  const add = (i) => {
+    const [r, c] = rc(i);
+    if (S.hole[r][c]) return;
+    if (S.box[r][c] > 0) { boxHit.add(i); return; }
+    if (protect.has(i) || clear.has(i) || unlock.has(i)) return;
+    const x = S.g[r][c]; if (!x) return;
+    if (x.lock) { unlock.add(i); return; }
+    clear.add(i); if (x.s) queue.push(i);
+  };
+  initial.forEach(add);
+  while (queue.length) {
+    const i = queue.shift(), [r, c] = rc(i), x = S.g[r][c];
+    effects.push({ s:x.s, i });
+    area(S, x, r, c).forEach(add);
+  }
+  // Quả bị phá làm hỏng thùng gỗ ngay cạnh
+  [...clear, ...protect].forEach((i) => {
+    const [r, c] = rc(i);
+    for (const [dr, dc] of DIRS) if (inb(r + dr, c + dc) && S.box[r + dr][c + dc] > 0) boxHit.add((r + dr) * N + c + dc);
+  });
+  return { clear, unlock, boxHit, effects };
+}
+
+// Áp dụng kết quả nổ, trả về điểm cộng thêm
+function applyBlast(S, res, spawns = [], combo = 1) {
+  let gain = 0;
+  res.clear.forEach((i) => {
+    const [r, c] = rc(i), x = S.g[r][c];
+    if (x.t >= 0) S.collected[x.t]++;
+    S.g[r][c] = null; gain += 10 * combo;
+    if (S.jelly[r][c] > 0) { S.jelly[r][c]--; gain += 20; }
+  });
+  res.unlock.forEach((i) => { const [r, c] = rc(i); S.g[r][c].lock = 0; gain += 20; });
+  res.boxHit.forEach((i) => { const [r, c] = rc(i); S.box[r][c]--; gain += 20; });
+  spawns.forEach((G) => {
+    const [r, c] = rc(G.spawn);
+    S.g[r][c] = { t:G.special === "r" ? -1 : G.t, s:G.special, lock:0 };
+    S.collected[G.t]++; gain += BONUS[G.special];
+    if (S.jelly[r][c] > 0) { S.jelly[r][c]--; gain += 20; }
+  });
+  S.score += gain;
+  return gain;
+}
+
+// Đổi 2 quả đặc biệt (hoặc cầu vồng + bất kỳ). Gọi SAU khi đã đổi chỗ.
+function comboArea(S, a, b) {
+  const [ra, ca] = rc(a), [rb, cb] = rc(b);
+  const P = S.g[rb][cb], Q = S.g[ra][ca];
+  const set = new Set([a, b]), fx = []; let label = "";
+  const addAll = (fn) => { for (let i = 0; i < N * N; i++) { const x = cellAt(S, i); if (x && fn(x)) set.add(i); } };
+  const striped = (s) => s === "h" || s === "v";
+  if (P.s === "r" && Q.s === "r") {
+    P.s = Q.s = 0;
+    for (let i = 0; i < N * N; i++) set.add(i);
+    fx.push({ s:"boom", i:b, k:9 }, { s:"rain" }); label = "💥 Nổ toàn bàn!";
+  } else if (P.s === "r" || Q.s === "r") {
+    const R = P.s === "r" ? P : Q, O = R === P ? Q : P, t = O.t;
+    R.s = 0;
+    if (O.s) {
+      const kind = O.s;
+      for (let i = 0; i < N * N; i++) {
+        const x = cellAt(S, i);
+        if (x && x !== O && x.t === t && !x.s && !x.lock) x.s = kind === "b" ? "b" : (Math.random() < 0.5 ? "h" : "v");
+      }
+      label = kind === "b" ? "🌈💣 Mưa bom!" : "🌈⚡ Mưa sọc!";
+    } else label = "🌈 Cầu vồng!";
+    addAll((x) => x.t === t);
+    fx.push({ s:"rain" });
+  } else {
+    const s1 = P.s, s2 = Q.s; P.s = Q.s = 0;
+    const rows = [], cols = [];
+    if (striped(s1) && striped(s2)) { rows.push(rb); cols.push(cb); label = "⚡ Chữ thập!"; }
+    else if (s1 === "b" && s2 === "b") {
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (inb(rb + dr, cb + dc)) set.add((rb + dr) * N + cb + dc);
+      fx.push({ s:"boom", i:b, k:5 }); label = "💣💣 Nổ lớn!";
+    } else {
+      for (let d = -1; d <= 1; d++) { if (inb(rb + d, 0)) rows.push(rb + d); if (inb(0, cb + d)) cols.push(cb + d); }
+      label = "⚡💣 Siêu sọc!";
+    }
+    rows.forEach((r) => { for (let k = 0; k < N; k++) set.add(r * N + k); fx.push({ s:"h", i:r * N + cb }); });
+    cols.forEach((c) => { for (let k = 0; k < N; k++) set.add(k * N + c); fx.push({ s:"v", i:rb * N + c }); });
+  }
+  return { set, fx, label };
+}
+
+// Quả rơi xuống. Ô trống / thùng / lồng chia cột thành từng đoạn; quả mới sinh ở đầu mỗi đoạn.
+function gravity(S) {
+  const falls = {};
+  for (let c = 0; c < N; c++) {
+    let r = N - 1;
+    while (r >= 0) {
+      if (isStatic(S, r, c)) { r--; continue; }
+      let top = r;
+      while (top - 1 >= 0 && !isStatic(S, top - 1, c)) top--;
+      let w = r;
+      for (let k = r; k >= top; k--) {
+        if (S.g[k][c]) {
+          if (w !== k) { S.g[w][c] = S.g[k][c]; S.g[k][c] = null; falls[w * N + c] = w - k; }
+          w--;
+        }
+      }
+      const empty = w - top + 1;
+      for (let k = w; k >= top; k--) { S.g[k][c] = { t:rnd(S), s:0, lock:0 }; falls[k * N + c] = empty; }
+      r = top - 1;
+    }
+  }
+  return falls;
+}
+
+function goalStatus(S) {
+  const G = S.goals, out = [];
+  let jelly = 0, box = 0, cage = 0;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    jelly += S.jelly[r][c]; if (S.box[r][c] > 0) box++; if (S.g[r][c] && S.g[r][c].lock) cage++;
+  }
+  if (G.score) out.push({ k:"score", left:Math.max(0, G.score - S.score) });
+  if (G.collect) for (const t in G.collect) out.push({ k:"fruit", t:+t, left:Math.max(0, G.collect[t] - S.collected[t]) });
+  if (G.jelly) out.push({ k:"jelly", left:jelly });
+  if (G.box) out.push({ k:"box", left:box });
+  if (G.cage) out.push({ k:"cage", left:cage });
+  return out;
+}
+const isWon = (S) => goalStatus(S).every((g) => g.left === 0);
+// ===== END ENGINE =====
+
+// ===== TELEGRAM =====
+const tgApp = window.Telegram && window.Telegram.WebApp;
+if (tgApp) { tgApp.ready(); tgApp.expand(); }
+const haptic = (t) => { try { tgApp.HapticFeedback.impactOccurred(t || "light"); } catch (e) {} };
+
+// ===== LƯU TIẾN TRÌNH =====
+function load() {
+  const d = { unlocked:1, stars:{}, hammers:2, shuffles:2, tut:0, seen:{}, lives:MAX_LIVES, livesAt:Date.now(), infUntil:0 };
+  try {
+    const old = JSON.parse(localStorage.getItem("m3save") || "{}");
+    if (old.level && !old.unlocked) old.unlocked = Math.min(old.level, LEVELS.length);
+    return Object.assign(d, old);
+  } catch (e) { return d; }
+}
+function persist() { try { localStorage.setItem("m3save", JSON.stringify(save)); } catch (e) {} }
+let save = load();
+
+// ===== HỆ THỐNG MẠNG =====
+const infinite = () => save.infUntil > Date.now();
+function syncLives() {
+  const now = Date.now();
+  if (save.lives >= MAX_LIVES) { save.lives = MAX_LIVES; save.livesAt = now; return; }
+  if (save.livesAt > now) save.livesAt = now; // chặn chỉnh giờ máy về tương lai rồi quay lại
+  const gained = Math.floor((now - save.livesAt) / REGEN_MS);
+  if (gained > 0) {
+    save.lives = Math.min(MAX_LIVES, save.lives + gained);
+    save.livesAt = save.lives >= MAX_LIVES ? now : save.livesAt + gained * REGEN_MS;
+    persist();
+  }
+}
+function useLife() {
+  syncLives();
+  if (infinite()) return "inf";
+  if (save.lives <= 0) return false;
+  if (save.lives >= MAX_LIVES) save.livesAt = Date.now();
+  save.lives--; persist();
+  return "life";
+}
+function refundLife() { syncLives(); save.lives = Math.min(MAX_LIVES, save.lives + 1); if (save.lives >= MAX_LIVES) save.livesAt = Date.now(); persist(); }
+const mmss = (ms) => { const t = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); };
+function livesLabel() {
+  if (infinite()) return `❤️ ♾️ ${mmss(save.infUntil - Date.now())}`;
+  if (save.lives >= MAX_LIVES) return `❤️ ${save.lives} · Đầy`;
+  return `❤️ ${save.lives} · ${mmss(save.livesAt + REGEN_MS - Date.now())}`;
+}
+function tickLives() {
+  syncLives();
+  const el = document.getElementById("lives"); if (el) el.textContent = livesLabel();
+  document.querySelectorAll(".lifeTimer").forEach((t) => {
+    t.textContent = infinite() ? "♾️ " + mmss(save.infUntil - Date.now()) : save.lives >= MAX_LIVES ? "Đã đầy!" : mmss(save.livesAt + REGEN_MS - Date.now());
+  });
+  document.querySelectorAll(".lifeCount").forEach((t) => { t.textContent = infinite() ? "♾️" : "❤️".repeat(save.lives) + "🤍".repeat(MAX_LIVES - save.lives); });
+  // Đang ở bảng "Hết mạng" mà đã hồi được mạng thì cho chơi luôn
+  const play = document.querySelector("[data-action=waitPlay]");
+  if (play) play.classList.toggle("hidden", !(save.lives > 0 || infinite()));
+}
+setInterval(tickLives, 1000);
+
+function showNoLives(n) {
+  syncLives();
+  showModal(`<h2>💔 Hết mạng!</h2>
+    <div class="lifebig lifeCount"></div>
+    <p style="margin:0">Mạng tiếp theo sau:</p>
+    <div class="timer lifeTimer"></div>
+    <button class="btn gold hidden" data-action="waitPlay" data-n="${n}">▶ Chơi màn ${n}</button>
+    <button class="btn gold" data-action="buy" data-item="lives5">${PRODUCTS.lives5.name} — ${PRODUCTS.lives5.stars} ⭐</button>
+    <button class="btn gold" data-action="buy" data-item="inf1h">${PRODUCTS.inf1h.name} — ${PRODUCTS.inf1h.stars} ⭐</button>
+    <button class="btn" data-action="map">Chờ hồi mạng</button>`);
+  tickLives();
+}
+function showLivesInfo() {
+  syncLives();
+  showModal(`<h2>❤️ Mạng</h2>
+    <div class="lifebig lifeCount"></div>
+    <p>Mỗi lần chơi tốn 1 mạng, thắng thì được trả lại. Cứ 30 phút hồi 1 mạng, tối đa ${MAX_LIVES}.</p>
+    <div class="timer lifeTimer"></div>
+    <button class="btn gold" data-action="buy" data-item="lives5">${PRODUCTS.lives5.name} — ${PRODUCTS.lives5.stars} ⭐</button>
+    <button class="btn gold" data-action="buy" data-item="inf1h">${PRODUCTS.inf1h.name} — ${PRODUCTS.inf1h.stars} ⭐</button>
+    <button class="btn" data-action="close">Đóng</button>`);
+  tickLives();
+}
+
+// ===== TRẠNG THÁI =====
+let S, LV = 1, LVD, STARS, busy = false, sel = null, mode = null;
+const $ = (id) => document.getElementById(id);
+const board = $("board"), wrap = $("wrap"), fxLayer = $("fx");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ===== BẢN ĐỒ MÀN =====
+function showMap() {
+  clearHint(); hideModal();
+  $("app").classList.add("hidden"); $("mapScreen").classList.remove("hidden");
+  $("inv").textContent = `🔨${save.hammers} 🔀${save.shuffles}`;
+  tickLives();
+  const max = Math.max(LEVELS.length, save.unlocked + 10);
+  let h = "";
+  for (let n = max; n >= 1; n--) {
+    const lv = getLevel(n), lock = n > save.unlocked, st = save.stars[n] || 0;
+    const cls = ["node", lock ? "lock" : lv.hard === 2 ? "super" : lv.hard ? "hard" : "", n === save.unlocked ? "cur" : ""].join(" ");
+    const tag = lv.hard === 2 ? `<span class="tag">SIÊU KHÓ</span>` : lv.hard ? `<span class="tag">KHÓ</span>` : "";
+    const x = Math.round(Math.sin(n * 0.85) * 95);
+    h += `<div class="nodewrap" style="transform:translateX(${x}px)"><button class="${cls}" data-action="level" data-n="${n}" id="node${n}">${lock ? "🔒" : n}${tag}</button>
+      <div class="stars">${lock ? "" : "⭐".repeat(st) + "☆".repeat(3 - st)}</div></div>`;
+  }
+  $("path").innerHTML = h;
+  const cur = $("node" + save.unlocked);
+  if (cur) cur.scrollIntoView({ block:"center" });
+}
+
+function goalChips(status, big) {
+  return status.map((g) => {
+    const done = g.left === 0 ? " done" : "";
+    const val = g.left === 0 ? "✓" : g.left;
+    if (g.k === "score") return `<div class="chip${done}">⭐ ${g.left === 0 ? "✓" : (big ? "" : "còn ") + g.left}</div>`;
+    if (g.k === "fruit") return `<div class="chip${done}">${FRUITS[g.t]} ${val}</div>`;
+    if (g.k === "jelly") return `<div class="chip${done}"><span class="ico-j"></span> ${val}</div>`;
+    if (g.k === "box") return `<div class="chip${done}">📦 ${val}</div>`;
+    return `<div class="chip${done}">⛓️ ${val}</div>`;
+  }).join("");
+}
+
+function openLevel(n) {
+  if (n > save.unlocked) return;
+  const lv = getLevel(n);
+  const preview = makeState(lv);
+  const badge = lv.hard === 2 ? `<span class="badge super">SIÊU KHÓ</span>` : lv.hard ? `<span class="badge hard">KHÓ</span>` : "";
+  const intro = lv.intro ? `<div class="intro">${INTROS[lv.intro]}</div>` : "";
+  const st = save.stars[n] || 0;
+  showModal(`<h2>Màn ${n} ${badge}</h2>
+    ${st ? `<div>${"⭐".repeat(st)}${"☆".repeat(3 - st)}</div>` : ""}
+    <p style="margin:8px 0 0">Nhiệm vụ trong <b>${lv.moves} lượt</b>:</p>
+    <div class="goals">${goalChips(goalStatus(preview), true)}</div>
+    ${intro}
+    <div class="lifeCount" style="font-size:20px;margin-bottom:4px"></div>
+    <button class="btn gold" data-action="play" data-n="${n}">▶ Chơi (−1 ❤️)</button>
+    <button class="btn" data-action="close">Đóng</button>`);
+  tickLives();
+}
+
+function startLevel(n) {
+  const life = useLife();
+  if (!life) return showNoLives(n);
+  LV = n; LVD = getLevel(n); STARS = starsFor(LVD);
+  S = makeState(LVD); S.life = life; S.done = false;
+  busy = false; sel = null; mode = null;
+  hideModal();
+  $("mapScreen").classList.add("hidden"); $("app").classList.remove("hidden");
+  const badge = LVD.hard === 2 ? `<span class="badge super">SIÊU KHÓ</span>` : LVD.hard ? `<span class="badge hard">KHÓ</span>` : "";
+  $("title").innerHTML = `Màn ${n}${badge}`;
+  const top = STARS[2];
+  $("prog").querySelectorAll(".mk").forEach((m) => m.remove());
+  STARS.forEach((s, k) => { if (s > 0) { const m = document.createElement("span"); m.className = "mk"; m.dataset.k = k; m.textContent = "⭐"; m.style.left = Math.min(97, s / top * 100) + "%"; $("prog").appendChild(m); } });
+  render(); hud(); scheduleHint();
+}
+
+// ===== HIỂN THỊ =====
+function piece(x) {
+  if (!x) return "";
+  let h = x.s === "r" ? `<span class="orb"></span>` : `<span class="fruit">${FRUITS[x.t]}</span>` + (x.s ? `<span class="fx-${x.s}"></span>` : "");
+  if (x.lock) h += `<span class="cage"></span>`;
+  return h;
+}
+
+function render(pop, falls, born, hits) {
+  const cs = board.clientWidth / N;
+  let h = "";
+  for (let i = 0; i < N * N; i++) {
+    const [r, c] = rc(i);
+    if (S.hole[r][c]) { h += `<div class="cell hole" data-i="${i}"></div>`; continue; }
+    const j = S.jelly[r][c], bx = S.box[r][c];
+    const ccls = "cell" + (j ? " j" + j : "") + (sel === i ? " sel" : "") + (mode === "hammer" ? " aim" : "");
+    if (bx) {
+      h += `<div class="${ccls}" data-i="${i}"><div class="box b${bx}${hits && hits.has(i) ? " hit" : ""}">${bx > 1 ? `<i>${bx}</i>` : ""}</div></div>`;
+      continue;
+    }
+    const x = S.g[r][c];
+    let cls = "gem", st = "";
+    if (x && x.s) cls += " sp-" + x.s;
+    if (pop && pop.has(i)) cls += " pop";
+    if (born && born.has(i)) cls += " born";
+    if (falls && falls[i]) { cls += " drop"; st = ` style="--d:${(falls[i] * cs).toFixed(1)}px"`; }
+    h += `<div class="${ccls}" data-i="${i}"><div class="${cls}"${st}>${piece(x)}</div></div>`;
+  }
+  board.innerHTML = h;
+}
+
+function hud() {
+  $("mv").textContent = S.moves;
+  $("sc").textContent = S.score;
+  $("goals").innerHTML = goalChips(goalStatus(S));
+  $("bar").style.width = Math.min(100, S.score / STARS[2] * 100) + "%";
+  $("prog").querySelectorAll(".mk").forEach((m) => m.classList.toggle("got", S.score >= STARS[+m.dataset.k]));
+  $("hammerBtn").textContent = `🔨 Búa (${save.hammers})`;
+  $("shuffleBtn").textContent = `🔀 Trộn (${save.shuffles})`;
+  $("hammerBtn").classList.toggle("on", mode === "hammer");
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 900);
+}
+
+function cellCenter(i) {
+  const el = board.children[i]; if (!el) return null;
+  const wr = wrap.getBoundingClientRect(), cr = el.getBoundingClientRect();
+  return { x:cr.left - wr.left + cr.width / 2, y:cr.top - wr.top + cr.height / 2, cs:cr.width };
+}
+function fxAdd(cls, x, y, vars) {
+  const d = document.createElement("div");
+  d.className = "f " + cls; d.style.left = x + "px"; d.style.top = y + "px";
+  for (const k in vars) d.style.setProperty(k, vars[k]);
+  fxLayer.appendChild(d); setTimeout(() => d.remove(), 700);
+}
+function showEffects(effects, clear) {
+  const W = board.offsetWidth, H = board.offsetHeight; let rain = false;
+  for (const e of effects) {
+    if (e.s === "r" || e.s === "rain") { rain = true; continue; }
+    const p = cellCenter(e.i); if (!p) continue;
+    const cs = p.cs + "px";
+    if (e.s === "h") fxAdd("bh", W / 2, p.y, { "--cs":cs, "--w":W + "px" });
+    else if (e.s === "v") fxAdd("bv", p.x, H / 2, { "--cs":cs, "--h":H + "px" });
+    else if (e.s === "b" || e.s === "boom") fxAdd("boom", p.x, p.y, { "--cs":cs, "--k":e.k || 3 });
+  }
+  if (rain) clear.forEach((i) => { const p = cellCenter(i); if (p) fxAdd("spark", p.x, p.y, { "--cs":p.cs + "px" }); });
+}
+
+// ===== GỢI Ý =====
+let hintTimer;
+function scheduleHint() {
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => {
+    if (!S || busy || $("modal").classList.contains("show") || $("app").classList.contains("hidden")) return scheduleHint();
+    const m = findMove(S); if (!m) return;
+    m.forEach((i) => { const g = board.children[i] && board.children[i].firstChild; if (g) g.classList.add("hint"); });
+  }, 6000);
+}
+function clearHint() {
+  clearTimeout(hintTimer);
+  board.querySelectorAll(".hint").forEach((e) => e.classList.remove("hint"));
+}
+
+// ===== LUẬT CHƠI =====
+async function blastUI(initial, combo, spawns = [], extraFx = []) {
+  const protect = new Set(spawns.map((G) => G.spawn));
+  const res = computeBlast(S, initial, protect);
+  const big = res.effects.length || extraFx.length;
+  showEffects(extraFx.concat(res.effects), res.clear);
+  render(res.clear, null, null, res.boxHit);
+  haptic(big ? "heavy" : combo > 1 ? "medium" : "light");
+  await sleep(big ? 320 : 250);
+  applyBlast(S, res, spawns, combo);
+  if (spawns.length) {
+    render(null, null, new Set(spawns.map((G) => G.spawn)));
+    toast(NAMES[spawns[0].special]); await sleep(260);
+  } else if (combo > 1) toast(`Combo x${combo}!`);
+  hud();
+  const falls = gravity(S);
+  render(null, falls);
+  await sleep(300);
+}
+
+async function resolve(prefer = [], combo = 1) {
+  for (;;) {
+    const gs = groups(S, prefer);
+    if (!gs.length) break;
+    const init = new Set(), spawns = [];
+    gs.forEach((G) => { G.cells.forEach((x) => init.add(x)); if (G.special && G.spawn >= 0) spawns.push(G); });
+    await blastUI(init, combo, spawns);
+    combo++; prefer = [];
+  }
+  if (!hasMove(S)) { toast("Hết nước – tự trộn!"); await sleep(500); shuffle(S); render(); }
+}
+
+async function trySwap(a, b) {
+  if (busy || S.moves <= 0) return;
+  if (!swappable(S, a) || !swappable(S, b)) return;
+  busy = true; sel = null; clearHint();
+  const A = cellAt(S, a), B = cellAt(S, b);
+  swapCells(S, a, b); render();
+  if (A.s === "r" || B.s === "r" || (A.s && B.s)) {
+    await sleep(150);
+    S.moves--; hud();
+    const { set, fx, label } = comboArea(S, a, b);
+    toast(label);
+    await blastUI(set, 1, [], fx);
+    await resolve([], 2);
+  } else if (!groups(S).length) {
+    await sleep(180); swapCells(S, a, b); render();
+    busy = false; scheduleHint(); return;
+  } else {
+    S.moves--; hud();
+    await resolve([b, a]);
+  }
+  hud();
+  await checkEnd();
+  busy = false; scheduleHint();
+}
+
+// Thắng còn dư lượt: mỗi lượt biến thành 1 quả sọc nổ tung
+async function finale() {
+  toast("🎉 Hoàn thành! Thưởng lượt dư");
+  await sleep(700);
+  let n = 0;
+  while (S.moves > 0 && n < 10) {
+    const cand = [];
+    for (let i = 0; i < N * N; i++) { const x = cellAt(S, i); if (x && !x.lock && !x.s) cand.push(i); }
+    if (!cand.length) break;
+    const i = cand[Math.floor(Math.random() * cand.length)];
+    cellAt(S, i).s = Math.random() < 0.5 ? "h" : "v";
+    S.moves--; n++; render(null, null, new Set([i])); hud();
+    await sleep(200);
+    await blastUI(new Set([i]), 1);
+    await resolve([], 2);
+  }
+  if (S.moves > 0) { S.score += S.moves * 100; S.moves = 0; }
+  hud();
+}
+
+async function checkEnd() {
+  if (isWon(S)) {
+    S.done = true;
+    if (S.moves > 0) await finale();
+    if (S.life === "life") refundLife();
+    const st = 1 + (S.score >= STARS[1] ? 1 : 0) + (S.score >= STARS[2] ? 1 : 0);
+    save.stars[LV] = Math.max(save.stars[LV] || 0, st);
+    const first = save.unlocked === LV;
+    save.unlocked = Math.max(save.unlocked, LV + 1);
+    let bonus = "";
+    if (first && LVD.hard) { save.hammers++; bonus = "<p>🎁 Thưởng màn khó: +1 Búa</p>"; }
+    persist(); haptic("heavy");
+    showModal(`<h2>🎉 Qua màn ${LV}!</h2>
+      <div class="bigstars">${"⭐".repeat(st)}${"☆".repeat(3 - st)}</div>
+      <p>Điểm: <b>${S.score}</b></p>${bonus}
+      <button class="btn gold" data-action="nextLevel">Màn tiếp theo ▶</button>
+      <button class="btn" data-action="map">Bản đồ</button>`);
+  } else if (S.moves <= 0) {
+    showModal(`<h2>😢 Hết lượt!</h2>
+      <p>Mua thêm lượt để không mất mạng. Còn thiếu:</p>
+      <div class="goals">${goalChips(goalStatus(S).filter((g) => g.left > 0), true)}</div>
+      <button class="btn gold" data-action="buy" data-item="moves5">+5 lượt — ${PRODUCTS.moves5.stars} ⭐</button>
+      <button class="btn" data-action="retry">Chơi lại</button>
+      <button class="btn" data-action="map">Bản đồ</button>`);
+  }
+}
+
+async function useHammer(i) {
+  const [r, c] = rc(i);
+  if (S.hole[r][c]) return;
+  busy = true; mode = null; clearHint(); save.hammers--; persist(); hud();
+  await blastUI(new Set([i]), 1);
+  await resolve([], 2);
+  hud(); await checkEnd();
+  busy = false; scheduleHint();
+}
+
+// ===== HƯỚNG DẪN =====
+function showHelp() {
+  showModal(`<h2>🍓 Cách chơi</h2>
+    <p>Vuốt để đổi chỗ 2 quả cạnh nhau. Ghép từ 3 quả giống nhau trở lên. Hoàn thành nhiệm vụ trước khi hết lượt!</p>
+    <div class="rule"><div class="demo"><div class="gem sp-h"><span class="fruit">🍓</span><span class="fx-h"></span></div></div>
+      <div><b>Ghép 4 thẳng hàng</b> → Quả sọc: phá cả hàng hoặc cột</div></div>
+    <div class="rule"><div class="demo"><div class="gem sp-b"><span class="fruit">🍋</span><span class="fx-b"></span></div></div>
+      <div><b>Ghép chữ L / T</b> → Bom: nổ 3×3 ô</div></div>
+    <div class="rule"><div class="demo"><span class="orb"></span></div>
+      <div><b>Ghép 5 thẳng hàng</b> → Cầu vồng: xóa hết 1 loại quả</div></div>
+    <div class="rule"><div class="demo" style="background:#ff5fc855;box-shadow:inset 0 0 0 2px #ff8ad866"></div>
+      <div><b>Thạch</b>: ghép quả nằm trên nó để phá</div></div>
+    <div class="rule"><div class="demo"><div class="box b1" style="width:90%;height:90%"></div></div>
+      <div><b>Thùng gỗ</b>: ghép sát bên cạnh để phá</div></div>
+    <div class="rule"><div class="demo"><span class="fruit">🍇</span><span class="cage"></span></div>
+      <div><b>Lồng</b>: ghép quả bị nhốt để mở lồng</div></div>
+    <p style="margin-top:12px">💡 Đổi 2 quả đặc biệt với nhau để tạo chiêu siêu mạnh!</p>
+    <button class="btn gold" data-action="close">Đã hiểu!</button>`);
+  save.tut = 1; persist();
+}
+
+// ===== CỬA HÀNG / THANH TOÁN STARS =====
+function openShop() {
+  const items = ["lives5", "inf1h", "hammer3", "shuffle3", "starter"].map((k) =>
+    `<div class="item"><span>${PRODUCTS[k].name}</span><button class="btn gold" data-action="buy" data-item="${k}">${PRODUCTS[k].stars} ⭐</button></div>`).join("");
+  showModal(`<h2>🛒 Cửa hàng</h2>${items}<button class="btn" data-action="close">Đóng</button>`);
+}
+
+function grant(item) {
+  if (item === "moves5" && S) { S.moves += 5; hideModal(); }
+  if (item === "lives5") { save.lives = MAX_LIVES; save.livesAt = Date.now(); }
+  if (item === "inf1h") save.infUntil = Math.max(Date.now(), save.infUntil) + 60 * 60 * 1000;
+  if ((item === "lives5" || item === "inf1h") && document.querySelector("[data-action=waitPlay]")) {
+    const n = +document.querySelector("[data-action=waitPlay]").dataset.n; persist(); tickLives(); toast("Đã nhận! ✨"); return startLevel(n);
+  }
+  if (item === "hammer3") save.hammers += 3;
+  if (item === "shuffle3") save.shuffles += 3;
+  if (item === "starter") { save.hammers += 5; save.shuffles += 5; }
+  persist(); tickLives(); if (S) hud();
+  $("inv").textContent = `🔨${save.hammers} 🔀${save.shuffles}`;
+  toast("Đã nhận! ✨");
+}
+
+async function buy(item) {
+  const demo = !API_URL || !tgApp || !tgApp.initData;
+  if (demo) { grant(item); toast("(Chế độ thử) Miễn phí ✨"); return; }
+  try {
+    const res = await fetch(API_URL + "/api/invoice", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ item, initData:tgApp.initData }),
+    });
+    const { link } = await res.json();
+    tgApp.openInvoice(link, (status) => {
+      if (status === "paid") { grant(item); haptic("heavy"); }
+      else if (status === "failed") toast("Thanh toán lỗi");
+    });
+  } catch (e) { toast("Không tạo được hóa đơn"); }
+}
+
+// ===== MODAL =====
+function showModal(html) { $("toast").classList.remove("show"); $("card").innerHTML = html; $("modal").classList.add("show"); }
+function hideModal() { $("modal").classList.remove("show"); }
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-action]");
+  if (!b) return;
+  const a = b.dataset.action;
+  if (a === "level") openLevel(+b.dataset.n);
+  if (a === "play") startLevel(+b.dataset.n);
+  if (a === "retry") startLevel(LV);
+  if (a === "nextLevel") openLevel(LV + 1);
+  if (a === "map") {
+    if (busy) return;
+    const playing = !$("app").classList.contains("hidden") && S && !S.done && S.moves > 0 && !$("modal").classList.contains("show");
+    if (playing && S.life === "life") {
+      showModal(`<h2>Thoát màn?</h2><p>Bạn sẽ mất mạng đã dùng cho lượt chơi này.</p>
+        <button class="btn gold" data-action="close">Chơi tiếp</button>
+        <button class="btn" data-action="quit">Thoát (mất 1 ❤️)</button>`);
+    } else showMap();
+  }
+  if (a === "quit") showMap();
+  if (a === "waitPlay") startLevel(+b.dataset.n);
+  if (a === "livesInfo") showLivesInfo();
+  if (a === "close") hideModal();
+  if (a === "shop") openShop();
+  if (a === "help") showHelp();
+  if (a === "buy") buy(b.dataset.item);
+  if (a === "hammer") {
+    if (busy) return;
+    if (save.hammers <= 0) return openShop();
+    mode = mode === "hammer" ? null : "hammer"; sel = null; render(); hud();
+    if (mode) toast("Chạm vào ô để đập");
+  }
+  if (a === "shuffle") {
+    if (busy) return;
+    if (save.shuffles <= 0) return openShop();
+    save.shuffles--; persist(); clearHint(); shuffle(S); render(); hud(); scheduleHint();
+  }
+});
+
+// ===== ĐIỀU KHIỂN =====
+let start = null;
+board.addEventListener("pointerdown", (e) => {
+  clearHint();
+  const cell = e.target.closest(".cell");
+  if (!cell || busy) return;
+  start = { i:+cell.dataset.i, x:e.clientX, y:e.clientY, moved:false };
+});
+board.addEventListener("pointermove", (e) => {
+  if (!start || start.moved || mode) return;
+  const dx = e.clientX - start.x, dy = e.clientY - start.y;
+  if (Math.hypot(dx, dy) < 18) return;
+  start.moved = true;
+  let [r, c] = rc(start.i);
+  if (Math.abs(dx) > Math.abs(dy)) c += dx > 0 ? 1 : -1; else r += dy > 0 ? 1 : -1;
+  if (!inb(r, c)) return;
+  trySwap(start.i, r * N + c);
+});
+board.addEventListener("pointerup", () => {
+  if (!start) return;
+  const s = start; start = null;
+  if (!s.moved) onTap(s.i);
+  scheduleHint();
+});
+board.addEventListener("pointercancel", () => { start = null; });
+
+function onTap(i) {
+  if (busy) return;
+  if (mode === "hammer") return useHammer(i);
+  if (!swappable(S, i)) { sel = null; render(); return; }
+  if (sel === null) { sel = i; render(); return; }
+  const [r1, c1] = rc(sel), [r2, c2] = rc(i);
+  if (Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1) trySwap(sel, i);
+  else { sel = sel === i ? null : i; render(); }
+}
+
+window.addEventListener("resize", () => { if (!busy && S && !$("app").classList.contains("hidden")) render(); });
+showMap();
+if (!save.tut) showHelp();
+</script>
+</body>
+</html>
